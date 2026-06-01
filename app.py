@@ -87,6 +87,49 @@ def _build_confirm_url(token, action="confirm"):
     return f"{SITE_BASE_URL.rstrip('/')}/confirm/{token}?action={action}"
 
 
+def _calc_heatmap(plan_id, days=42):
+    """计算最近 N 天的打卡热力图数据"""
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days - 1)
+    result = []
+
+    d = start_date
+    while d <= end_date:
+        tasks = (
+            DailyTask.query
+            .filter_by(plan_id=plan_id)
+            .filter(DailyTask.task_date == d)
+            .all()
+        )
+        total = len(tasks)
+        if total == 0:
+            level = -1  # 无数据
+        else:
+            done = len([t for t in tasks if t.status == TaskStatus.COMPLETED.value])
+            pct = done / total
+            if pct == 0:
+                level = 0
+            elif pct < 0.4:
+                level = 1
+            elif pct < 0.7:
+                level = 2
+            elif pct < 1:
+                level = 3
+            else:
+                level = 4
+        result.append({
+            "date": d.isoformat(),
+            "label": f"{d.month}/{d.day}",
+            "weekday": d.weekday(),
+            "level": level,
+            "total": total,
+            "is_today": d == date.today(),
+        })
+        d += timedelta(days=1)
+
+    return result
+
+
 # ─── 页面路由 ─────────────────────────────────────────────
 
 @app.route("/")
@@ -104,6 +147,15 @@ def index():
     completed = len([t for t in tasks if t.status == TaskStatus.COMPLETED.value])
     in_progress = len([t for t in tasks if t.status == TaskStatus.PARTIAL.value])
 
+    # 完成百分比（用于 SVG 进度环）
+    pct = int((completed + in_progress * 0.5) / total * 100) if total > 0 else 0
+    # SVG 进度环：圆周长 = 2*PI*r ≈ 2*3.14159*44 ≈ 276.46
+    ring_circumference = 276.46
+    ring_offset = ring_circumference * (1 - pct / 100)
+
+    # 热力图最近 42 天
+    heatmap = _calc_heatmap(plan.id, 42)
+
     return render_template(
         "index.html",
         plan=plan,
@@ -112,6 +164,9 @@ def index():
         total=total,
         completed=completed,
         in_progress=in_progress,
+        pct=pct,
+        ring_offset=ring_offset,
+        heatmap=heatmap,
         today=date.today(),
     )
 
@@ -262,6 +317,17 @@ def progress():
             dates_data[d]["completed"] += 1
 
     streak = _calc_streak(plan.id)
+    heatmap = _calc_heatmap(plan.id, 42)
+
+    # 总体环形进度数据
+    overall_total = math_total + eng_total
+    overall_done = math_done + eng_done
+    overall_pct = int(overall_done / overall_total * 100) if overall_total > 0 else 0
+    ring_circumference_lg = 395.84  # 2*PI*63
+    ring_offset_lg = ring_circumference_lg * (1 - overall_pct / 100)
+
+    math_pct = int(math_done / math_total * 100) if math_total > 0 else 0
+    eng_pct = int(eng_done / eng_total * 100) if eng_total > 0 else 0
 
     return render_template(
         "progress.html",
@@ -270,7 +336,12 @@ def progress():
         eng_total=eng_total,
         math_done=math_done,
         eng_done=eng_done,
+        math_pct=math_pct,
+        eng_pct=eng_pct,
+        overall_pct=overall_pct,
+        ring_offset_lg=ring_offset_lg,
         dates_data=dates_data,
+        heatmap=heatmap,
         streak=streak,
     )
 
@@ -292,6 +363,70 @@ def api_check_task(task_id):
     task.status = new_status
     db.session.commit()
     return jsonify({"ok": True, "task": task.to_dict()})
+
+
+@app.route("/api/task", methods=["POST"])
+def api_create_task():
+    """手动创建今日新任务"""
+    plan = _get_active_plan()
+    if not plan:
+        return jsonify({"error": "没有活跃的备考计划"}), 400
+
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"error": "任务标题不能为空"}), 400
+
+    task = DailyTask(
+        plan_id=plan.id,
+        task_date=date.today(),
+        subject=data.get("subject", "math"),
+        title=title,
+        description=data.get("description", ""),
+        estimated_minutes=int(data.get("estimated_minutes", 60)),
+        priority=data.get("priority", TaskPriority.MEDIUM.value),
+        status=TaskStatus.CONFIRMED.value,
+        is_adjusted=True,
+    )
+    db.session.add(task)
+    db.session.commit()
+    return jsonify({"ok": True, "task": task.to_dict()}), 201
+
+
+@app.route("/api/task/<int:task_id>", methods=["PUT"])
+def api_update_task(task_id):
+    """更新任务字段"""
+    task = db.session.get(DailyTask, task_id)
+    if not task:
+        return jsonify({"error": "任务不存在"}), 404
+
+    data = request.get_json() or {}
+    if "title" in data and data["title"].strip():
+        task.title = data["title"].strip()
+    if "subject" in data and data["subject"] in ("math", "english", "rest"):
+        task.subject = data["subject"]
+    if "estimated_minutes" in data:
+        task.estimated_minutes = int(data["estimated_minutes"])
+    if "priority" in data and data["priority"] in ("high", "medium", "low"):
+        task.priority = data["priority"]
+    if "description" in data:
+        task.description = data["description"]
+
+    task.is_adjusted = True
+    db.session.commit()
+    return jsonify({"ok": True, "task": task.to_dict()})
+
+
+@app.route("/api/task/<int:task_id>", methods=["DELETE"])
+def api_delete_task(task_id):
+    """删除单个任务"""
+    task = db.session.get(DailyTask, task_id)
+    if not task:
+        return jsonify({"error": "任务不存在"}), 404
+
+    db.session.delete(task)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/confirm", methods=["POST"])
@@ -443,9 +578,50 @@ def api_adjust_weekly(plan_id):
         return jsonify({"error": str(e)}), 500
 
 
+# ─── 云端推送触发器（供 Render Cron 调用）───────
+
+@app.route("/api/push/preview")
+def api_push_preview():
+    """触发晚间预览推送"""
+    from daily_preview import main as preview_main
+    try:
+        preview_main()
+        return jsonify({"ok": True, "type": "preview"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/push/morning")
+def api_push_morning():
+    """触发早安推送"""
+    from morning_push import main as morning_main
+    try:
+        morning_main()
+        return jsonify({"ok": True, "type": "morning"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 # ─── 启动入口 ─────────────────────────────────────────────
 
 if __name__ == "__main__":
+    import os as _os
+    is_prod = _os.environ.get("RENDER") == "1"
+
+    if is_prod:
+        # 云端环境：启动 APScheduler 定时推送
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from daily_preview import main as _preview_main
+        from morning_push import main as _morning_main
+        import atexit
+
+        _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
+        _scheduler.add_job(_preview_main, "cron", hour=PREVIEW_HOUR, minute=0, id="preview")
+        _scheduler.add_job(_morning_main, "cron", hour=MORNING_HOUR, minute=0, id="morning")
+        _scheduler.start()
+        atexit.register(lambda: _scheduler.shutdown())
+        print(f"[SCHEDULER] Push jobs registered: {PREVIEW_HOUR:02d}:00 & {MORNING_HOUR:02d}:00 CST")
+
     print(f"""
 +============================================+
 |     Study Planner - AI Exam Prep v1.0      |

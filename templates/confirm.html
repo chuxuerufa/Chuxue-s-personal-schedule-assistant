@@ -2,35 +2,36 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="/static/style.css">
-    <title>确认明日计划 - 备考助手</title>
+    <title>确认计划 - 备考助手</title>
 </head>
 <body>
     <div class="app-container">
         <nav class="top-nav">
-            <a href="/" class="back-btn">← 返回首页</a>
-            <h1 class="app-title">
-                {% if action == 'adjust' %}✏️ 调整计划{% else %}✅ 确认计划{% endif %}
-            </h1>
+            <a href="/" class="nav-back">&larr; 返回</a>
+            <span class="nav-title">
+                {% if action == 'adjust' %}调整计划{% else %}确认计划{% endif %}
+            </span>
+            <span></span>
         </nav>
 
         <div class="confirm-header">
-            <span class="confirm-date">📅 {{ confirm_date }}</span>
+            <span class="confirm-date">{{ confirm_date }}</span>
             <span>共 {{ tasks | length }} 项任务</span>
         </div>
 
         {% if action == 'confirm' %}
-        <!-- 确认模式：快速预览 + 一键确认 -->
+        <!-- 确认模式 -->
         <main class="task-list">
             {% for task in tasks %}
             <div class="task-item status-{{ task.status }}">
-                <span class="subject-icon">{{ '📐' if task.subject == 'math' else '📝' }}</span>
+                <span class="subject-icon">{{ 'M' if task.subject == 'math' else 'E' }}</span>
                 <div class="task-content">
                     <div class="task-title">{{ task.title }}</div>
                     <div class="task-meta">
-                        <span>⏱ {{ task.estimated_minutes }}分钟</span>
-                        {% if task.priority == 'high' %}<span class="task-priority high">⭐ 优先</span>{% endif %}
+                        <span>{{ task.estimated_minutes }}分钟</span>
+                        {% if task.priority == 'high' %}<span class="task-priority high">优先</span>{% endif %}
                     </div>
                 </div>
             </div>
@@ -38,47 +39,46 @@
 
             {% if not tasks %}
             <div class="empty-state">
-                <p>明天暂无安排，好好休息！</p>
+                <p>明天暂无安排，好好休息</p>
             </div>
             {% endif %}
 
             <div class="confirm-actions">
-                <button class="btn-primary btn-large" onclick="confirmPlan()">
-                    ✅ 确认计划，明天按此执行
+                <button class="btn-ios primary large" onclick="confirmPlan()">
+                    确认计划
                 </button>
-                <a href="?action=adjust" class="btn-secondary" style="text-align:center;display:block;">
-                    ✏️ 需要调整
+                <a href="?action=adjust" class="btn-ios secondary large" style="display:block;margin-top:8px;">
+                    调整计划
                 </a>
             </div>
         </main>
 
         {% else %}
-        <!-- 调整模式：可增删改任务 -->
+        <!-- 调整模式 -->
         <main class="task-list editable" id="adjustList">
             {% for task in tasks %}
             <div class="task-item status-{{ task.status }}" data-task-id="{{ task.id }}">
-                <span class="drag-handle">⠿</span>
-                <span class="subject-icon">{{ '📐' if task.subject == 'math' else '📝' }}</span>
+                <span class="drag-handle">=</span>
+                <span class="subject-icon">{{ 'M' if task.subject == 'math' else 'E' }}</span>
                 <div class="task-content">
                     <input type="text" class="task-title-input" value="{{ task.title }}">
                     <div class="task-meta-row">
                         <select class="subject-select">
-                            <option value="math" {% if task.subject == 'math' %}selected{% endif %}>📐 高数</option>
-                            <option value="english" {% if task.subject == 'english' %}selected{% endif %}>📝 英语</option>
+                            <option value="math" {% if task.subject == 'math' %}selected{% endif %}>高数</option>
+                            <option value="english" {% if task.subject == 'english' %}selected{% endif %}>英语</option>
                         </select>
                         <input type="number" class="time-input" value="{{ task.estimated_minutes }}" min="5" max="180" step="5"> 分钟
                     </div>
                 </div>
-                <button class="delete-btn" onclick="this.parentElement.remove()">✕</button>
+                <button class="delete-btn" onclick="this.parentElement.remove()">&times;</button>
             </div>
             {% endfor %}
 
-            <!-- 添加新任务按钮 -->
             <button class="add-task-btn" onclick="addNewTask()">+ 添加任务</button>
 
             <div class="confirm-actions">
-                <button class="btn-primary btn-large" onclick="saveAdjustments()">
-                    💾 保存调整
+                <button class="btn-ios primary large" onclick="saveAdjustments()">
+                    保存调整
                 </button>
             </div>
         </main>
@@ -98,22 +98,19 @@
             if (data.ok) {
                 document.querySelector('.confirm-actions').innerHTML = `
                     <div class="success-message">
-                        <div class="success-icon">✅</div>
-                        <h2>已确认！</h2>
-                        <p>明天早上将在飞书收到今日计划推送</p>
-                        <a href="/" class="btn-primary">返回首页</a>
+                        <div class="success-icon">&#10003;</div>
+                        <h2>已确认</h2>
+                        <p>明天早上将在飞书收到计划推送</p>
+                        <a href="/" class="btn-ios primary">返回首页</a>
                     </div>
                 `;
             } else {
-                alert('确认失败：' + (data.error || '未知错误'));
+                alert('确认失败：' + (data.error || ''));
             }
         }
 
         async function saveAdjustments() {
             const taskItems = document.querySelectorAll('#adjustList .task-item');
-            const taskIds = Array.from(taskItems).map(el => parseInt(el.dataset.taskId));
-
-            // 收集被修改的任务和新任务
             const existingIds = [];
             const newTasks = [];
 
@@ -129,35 +126,28 @@
                         subject: subjectSelect.value,
                         estimated_minutes: parseInt(timeInput.value),
                     };
-                    if (id) {
-                        existingIds.push(id);
-                    } else {
-                        newTasks.push(taskData);
-                    }
+                    if (id) { existingIds.push(id); }
+                    else { newTasks.push(taskData); }
                 }
             });
 
             const resp = await fetch('/api/confirm/adjust', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    token: token,
-                    task_ids: existingIds,
-                    new_tasks: newTasks,
-                })
+                body: JSON.stringify({ token: token, task_ids: existingIds, new_tasks: newTasks })
             });
             const data = await resp.json();
             if (data.ok) {
                 document.querySelector('.confirm-actions').innerHTML = `
                     <div class="success-message">
-                        <div class="success-icon">✅</div>
-                        <h2>调整已保存！</h2>
+                        <div class="success-icon">&#10003;</div>
+                        <h2>调整已保存</h2>
                         <p>明天早上将在飞书收到更新后的计划</p>
-                        <a href="/" class="btn-primary">返回首页</a>
+                        <a href="/" class="btn-ios primary">返回首页</a>
                     </div>
                 `;
             } else {
-                alert('保存失败：' + (data.error || '未知错误'));
+                alert('保存失败：' + (data.error || ''));
             }
         }
 
@@ -167,19 +157,19 @@
             div.className = 'task-item status-pending';
             div.dataset.taskId = '0';
             div.innerHTML = `
-                <span class="drag-handle">⠿</span>
-                <span class="subject-icon">📝</span>
+                <span class="drag-handle">=</span>
+                <span class="subject-icon">E</span>
                 <div class="task-content">
-                    <input type="text" class="task-title-input" placeholder="请输入任务名称...">
+                    <input type="text" class="task-title-input" placeholder="任务名称...">
                     <div class="task-meta-row">
                         <select class="subject-select">
-                            <option value="math">📐 高数</option>
-                            <option value="english" selected>📝 英语</option>
+                            <option value="math">高数</option>
+                            <option value="english" selected>英语</option>
                         </select>
                         <input type="number" class="time-input" value="45" min="5" max="180" step="5"> 分钟
                     </div>
                 </div>
-                <button class="delete-btn" onclick="this.parentElement.remove()">✕</button>
+                <button class="delete-btn" onclick="this.parentElement.remove()">&times;</button>
             `;
             list.insertBefore(div, document.querySelector('.add-task-btn'));
         }

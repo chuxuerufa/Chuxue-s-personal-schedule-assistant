@@ -2,83 +2,130 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="/static/style.css">
-    <title>学习进度 - 备考助手</title>
+    <title>进度 - 备考助手</title>
 </head>
 <body>
     <div class="app-container">
         <nav class="top-nav">
-            <a href="/" class="back-btn">← 返回</a>
-            <h1 class="app-title">📊 学习进度</h1>
+            <a href="/" class="nav-back">← 返回</a>
+            <span class="nav-title">备考助手</span>
+            <span></span>
         </nav>
 
-        {% if streak > 0 %}
-        <div class="streak-badge large">
-            🔥 连续打卡 <strong>{{ streak }}</strong> 天
+        <div class="large-title-area">
+            <h1 class="large-title">进度</h1>
+            {% if streak > 0 %}
+            <div class="streak-inline">连续打卡 {{ streak }} 天</div>
+            {% endif %}
         </div>
-        {% endif %}
 
-        <!-- 科目进度 -->
+        <!-- 总体环形进度 -->
+        <div class="progress-ring-wrap">
+            <div class="ring-container">
+                <svg viewBox="0 0 100 100">
+                    <circle class="ring-bg" cx="50" cy="50" r="44"/>
+                    <circle class="ring-fill" cx="50" cy="50" r="44"
+                            stroke-dasharray="276.46"
+                            stroke-dashoffset="{{ ring_offset_lg }}"/>
+                </svg>
+                <div class="ring-center">
+                    <span class="ring-pct">{{ overall_pct }}%</span>
+                    <span class="ring-sub">总进度</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 科目卡片 -->
         <div class="stats-grid">
-            <div class="stat-card math">
-                <div class="stat-icon">📐</div>
-                <div class="stat-label">高数</div>
-                <div class="stat-numbers">
-                    {{ math_done }} / {{ math_total }}
+            <div class="stat-card-ios math">
+                <div class="stat-icon-ios">M</div>
+                <div class="stat-label-ios">高数</div>
+                <div class="stat-number-ios">{{ math_done }}<span style="font-size:16px;color:var(--text-muted);font-weight:400"> / {{ math_total }}</span></div>
+                <div class="stat-bar-bg-ios">
+                    <div class="stat-bar-ios math-bar" style="width:{{ math_pct }}%"></div>
                 </div>
-                <div class="stat-bar-bg">
-                    <div class="stat-bar math-fill" style="width: {{ (math_done / math_total * 100) if math_total > 0 else 0 }}%"></div>
-                </div>
-                <div class="stat-pct">
-                    {{ "%.0f" | format(math_done / math_total * 100) if math_total > 0 else 0 }}%
-                </div>
+                <div class="stat-sub-ios">{{ math_pct }}%</div>
             </div>
-            <div class="stat-card english">
-                <div class="stat-icon">📝</div>
-                <div class="stat-label">英语</div>
-                <div class="stat-numbers">
-                    {{ eng_done }} / {{ eng_total }}
+            <div class="stat-card-ios english">
+                <div class="stat-icon-ios">E</div>
+                <div class="stat-label-ios">英语</div>
+                <div class="stat-number-ios">{{ eng_done }}<span style="font-size:16px;color:var(--text-muted);font-weight:400"> / {{ eng_total }}</span></div>
+                <div class="stat-bar-bg-ios">
+                    <div class="stat-bar-ios eng-bar" style="width:{{ eng_pct }}%"></div>
                 </div>
-                <div class="stat-bar-bg">
-                    <div class="stat-bar eng-fill" style="width: {{ (eng_done / eng_total * 100) if eng_total > 0 else 0 }}%"></div>
-                </div>
-                <div class="stat-pct">
-                    {{ "%.0f" | format(eng_done / eng_total * 100) if eng_total > 0 else 0 }}%
-                </div>
+                <div class="stat-sub-ios">{{ eng_pct }}%</div>
             </div>
         </div>
 
-        <!-- 总进度 -->
-        <div class="overall-progress">
-            <h3>总进度</h3>
-            {% set total_all = math_total + eng_total %}
-            {% set done_all = math_done + eng_done %}
-            <div class="big-progress-bar">
-                <div class="big-progress-fill" style="width: {{ (done_all / total_all * 100) if total_all > 0 else 0 }}%">
-                    {% if total_all > 0 %}{{ "%.0f" | format(done_all / total_all * 100) }}%{% endif %}
+        <!-- 热力图 -->
+        <div class="heatmap-wrap" style="margin-top:16px;">
+            <div class="heatmap-header-row">
+                <span class="heatmap-label">打卡记录</span>
+                <div class="heatmap-legend">
+                    <span>少</span>
+                    <div class="heatmap-legend-dot" style="background:rgba(60,60,67,0.06)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.15)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.35)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.55)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.78)"></div>
+                    <span>多</span>
                 </div>
             </div>
-            <div class="big-progress-text">{{ done_all }} / {{ total_all }} 任务已完成</div>
-        </div>
-
-        <!-- 每日完成率 -->
-        {% if dates_data %}
-        <div class="daily-stats">
-            <h3>每日完成率</h3>
-            <div class="daily-list">
-                {% for d, stats in dates_data.items() | sort %}
-                <div class="daily-row">
-                    <span class="daily-date">{{ d }}</span>
-                    <div class="daily-bar-bg">
-                        <div class="daily-bar-fill" style="width: {{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
-                    </div>
-                    <span class="daily-count">{{ stats.completed }}/{{ stats.total }}</span>
+            <div class="heatmap-grid">
+                {% for cell in heatmap %}
+                <div class="heatmap-cell{% if cell.is_today %} today{% endif %}"
+                     data-level="{{ cell.level }}"
+                     title="{{ cell.label }}{% if cell.level >= 0 %} · {{ cell.total }}项{% endif %}">
                 </div>
                 {% endfor %}
             </div>
         </div>
+
+        <!-- 每日列表 -->
+        {% if dates_data %}
+        <div class="daily-list-section" style="margin-top:16px;">
+            <h3>每日详情</h3>
+            {% for d, stats in dates_data.items() | sort | reverse %}
+            <div class="daily-row-ios">
+                <span class="daily-date-col">{{ d }}</span>
+                <div class="daily-bar-col">
+                    <div class="daily-bar-fill-col" style="width:{{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                </div>
+                <span class="daily-count-col">{{ stats.completed }}/{{ stats.total }}</span>
+            </div>
+            {% endfor %}
+        </div>
         {% endif %}
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+            <a href="/" class="tab-item">
+                <span class="tab-icon">&#x25A3;</span>
+                <span>今日</span>
+            </a>
+            <a href="/progress" class="tab-item active">
+                <span class="tab-icon">&#x25E3;</span>
+                <span>进度</span>
+            </a>
+            <a href="/plan/{{ plan.id }}" class="tab-item">
+                <span class="tab-icon">&#x25A8;</span>
+                <span>计划</span>
+            </a>
+        </div>
     </div>
+
+    <script>
+        (function() {
+            var ring = document.querySelector('.ring-fill');
+            if (ring) {
+                var c = 276.46, o = parseFloat(ring.getAttribute('stroke-dashoffset'));
+                ring.style.strokeDasharray = c;
+                ring.style.strokeDashoffset = c;
+                setTimeout(function() { ring.style.strokeDashoffset = o; }, 250);
+            }
+        })();
+    </script>
 </body>
 </html>

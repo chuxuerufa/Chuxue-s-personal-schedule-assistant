@@ -2,20 +2,25 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="/static/style.css">
-    <title>创建备考计划 - 备考助手</title>
+    <title>创建计划 - 备考助手</title>
 </head>
 <body>
     <div class="app-container">
         <nav class="top-nav">
-            <a href="/" class="back-btn">← 返回</a>
-            <h1 class="app-title">创建备考计划</h1>
+            <a href="/" class="nav-back">&larr; 返回</a>
+            <span class="nav-title">备考助手</span>
+            <span></span>
         </nav>
+
+        <div class="large-title-area">
+            <h1 class="large-title">创建计划</h1>
+        </div>
 
         {% if existing and not error %}
         <div class="info-banner">
-            ⚠️ 检测到已有活跃计划「{{ existing.name }}」，创建新计划将自动归档旧计划。
+            检测到已有活跃计划「{{ existing.name }}」，创建新计划将自动归档旧计划。
         </div>
         {% endif %}
 
@@ -24,80 +29,82 @@
         {% endif %}
 
         <form method="POST" class="plan-form" id="planForm">
-            <!-- 步骤 1: 考试信息 -->
-            <fieldset class="form-section">
-                <legend>📅 考试信息</legend>
-                <div class="form-group">
-                    <label for="exam_date">考试日期</label>
-                    <input type="date" id="exam_date" name="exam_date" required
-                           min="{{ today }}">
+            <!-- 考试信息 -->
+            <div class="form-card-header">考试信息</div>
+            <div class="form-card">
+                <div class="form-card-body">
+                    <div class="form-group">
+                        <label for="exam_date">考试日期</label>
+                        <input type="date" id="exam_date" name="exam_date" required min="{{ today }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="exam_name">计划名称</label>
+                        <input type="text" id="exam_name" value="专升本备考计划" readonly style="color:var(--text-muted);">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="exam_name">计划名称</label>
-                    <input type="text" id="exam_name" value="专升本备考计划" readonly
-                           style="color:#999;">
-                </div>
-            </fieldset>
+            </div>
 
-            <!-- 步骤 2: 当前水平 -->
-            <fieldset class="form-section">
-                <legend>📊 当前水平自评</legend>
-                <div class="form-group">
-                    <label for="math_level">高数水平</label>
-                    <select id="math_level" name="math_level" required>
-                        <option value="">-- 请选择 --</option>
-                        <option value="零基础">零基础（几乎没学过）</option>
-                        <option value="有基础但不扎实">有基础但不扎实（学过但忘了很多）</option>
-                        <option value="基础较好">基础较好（概念清楚，需要刷题提升）</option>
-                        <option value="基础扎实">基础扎实（已系统学过，主要是冲刺拔高）</option>
-                    </select>
+            <!-- 当前水平 -->
+            <div class="form-card-header">当前水平自评</div>
+            <div class="form-card">
+                <div class="form-card-body">
+                    <div class="form-group">
+                        <label for="math_level">高数水平</label>
+                        <select id="math_level" name="math_level" required>
+                            <option value="">-- 请选择 --</option>
+                            <option value="零基础">零基础（几乎没学过）</option>
+                            <option value="有基础但不扎实">有基础但不扎实（学过但忘了很多）</option>
+                            <option value="基础较好">基础较好（概念清楚，需要刷题提升）</option>
+                            <option value="基础扎实">基础扎实（已系统学过，主要是冲刺拔高）</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="english_level">英语水平</label>
+                        <select id="english_level" name="english_level" required>
+                            <option value="">-- 请选择 --</option>
+                            <option value="基础薄弱">基础薄弱（词汇量少，语法不熟）</option>
+                            <option value="中等水平">中等水平（通过四级或相当水平）</option>
+                            <option value="较好水平">较好水平（通过六级或相当水平）</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="english_level">英语水平</label>
-                    <select id="english_level" name="english_level" required>
-                        <option value="">-- 请选择 --</option>
-                        <option value="基础薄弱">基础薄弱（词汇量少，语法不熟）</option>
-                        <option value="中等水平">中等水平（通过四级或相当水平）</option>
-                        <option value="较好水平">较好水平（通过六级或相当水平）</option>
-                    </select>
-                </div>
-            </fieldset>
+            </div>
 
-            <!-- 步骤 3: 学习安排 -->
-            <fieldset class="form-section">
-                <legend>⏰ 学习安排</legend>
-                <div class="form-group">
-                    <label for="daily_hours">每天可用学习时间（小时）</label>
-                    <input type="number" id="daily_hours" name="daily_hours"
-                           min="1" max="12" step="0.5" value="4" required>
+            <!-- 学习安排 -->
+            <div class="form-card-header">学习安排</div>
+            <div class="form-card">
+                <div class="form-card-body">
+                    <div class="form-group">
+                        <label for="daily_hours">每天可用学习时间（小时）</label>
+                        <input type="number" id="daily_hours" name="daily_hours"
+                               min="1" max="12" step="0.5" value="4" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="weak_subjects">薄弱环节（选填）</label>
+                        <textarea id="weak_subjects" name="weak_subjects" rows="2"
+                                  placeholder="例如：高数积分运算不熟练、英语阅读速度慢"></textarea>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="weak_subjects">薄弱环节（选填）</label>
-                    <textarea id="weak_subjects" name="weak_subjects" rows="2"
-                              placeholder="例如：高数积分运算不熟练、英语阅读速度慢..."></textarea>
-                </div>
-            </fieldset>
+            </div>
 
-            <button type="submit" class="btn-primary btn-large" id="submitBtn">
-                🤖 让 AI 生成备考计划
+            <button type="submit" class="btn-ios primary large" id="submitBtn" style="margin: 8px 16px 0; width: calc(100% - 32px);">
+                AI 生成备考计划
             </button>
-            <p class="form-hint">AI 将根据你的信息生成一份分阶段的完整备考计划，预计需要 10-30 秒。</p>
+            <p class="form-hint">AI 将根据你的信息生成阶段性备考计划，预计需要 10-30 秒。</p>
         </form>
     </div>
 
     <script>
-        // 设置日期默认值为合理的考试日期
         const today = new Date();
         const defaultExam = new Date(today);
-        defaultExam.setMonth(today.getMonth() + 10); // 默认10个月后
+        defaultExam.setMonth(today.getMonth() + 10);
         document.getElementById('exam_date').value = defaultExam.toISOString().split('T')[0];
         document.getElementById('exam_date').min = new Date(today.getTime() + 86400000).toISOString().split('T')[0];
 
-        // 提交时显示加载状态
         document.getElementById('planForm').addEventListener('submit', function() {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
-            btn.textContent = '⏳ AI 正在生成计划，请稍候...';
+            btn.textContent = 'AI 正在生成计划，请稍候...';
         });
     </script>
 </body>

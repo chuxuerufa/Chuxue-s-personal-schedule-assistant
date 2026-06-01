@@ -2,107 +2,213 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="备考助手">
     <link rel="stylesheet" href="/static/style.css">
-    <title>今日计划 - 备考助手</title>
+    <title>今日 - 备考助手</title>
 </head>
 <body>
     <div class="app-container">
-        <!-- 顶部导航 -->
+        <!-- iOS 导航栏 -->
         <nav class="top-nav">
-            <h1 class="app-title">📚 备考助手</h1>
-            <div class="nav-links">
-                <a href="/" class="active">今日</a>
-                <a href="/progress">进度</a>
-                <a href="/plan/{{ plan.id }}">计划</a>
-            </div>
+            <span class="nav-title">备考助手</span>
+            <button class="nav-action" onclick="toggleAddForm()" id="addBtn">+ 添加</button>
         </nav>
 
-        <!-- 考试倒计时 -->
-        <div class="countdown-bar">
-            <span>⏳ 距 <strong>{{ plan.name }}</strong> 考试还有 <strong>{{ plan.to_dict().days_remaining }}</strong> 天</span>
+        <!-- 大标题区 -->
+        <div class="large-title-area">
+            <h1 class="large-title">今日</h1>
+            <div class="countdown-inline">
+                距 <strong>{{ plan.name }}</strong> · {{ plan.to_dict().days_remaining }} 天
+            </div>
+            {% if streak > 0 %}
+            <div class="streak-inline">连续打卡 {{ streak }} 天</div>
+            {% endif %}
         </div>
 
-        <!-- 打卡 streak -->
-        {% if streak > 0 %}
-        <div class="streak-badge">
-            🔥 连续打卡 <strong>{{ streak }}</strong> 天
-        </div>
-        {% endif %}
-
-        <!-- 今日进度条 -->
+        <!-- 进度环 -->
         {% if total > 0 %}
-        <div class="progress-summary">
-            <div class="progress-bar-container">
-                <div class="progress-bar" style="width: {{ (completed + in_progress * 0.5) / total * 100 }}%"></div>
-            </div>
-            <div class="progress-text">
-                完成 {{ completed }}/{{ total }}
-                {% if in_progress > 0 %}（{{ in_progress }} 项进行中）{% endif %}
+        <div class="progress-ring-wrap">
+            <div class="ring-container">
+                <svg viewBox="0 0 100 100">
+                    <circle class="ring-bg" cx="50" cy="50" r="44"/>
+                    <circle class="ring-fill" cx="50" cy="50" r="44"
+                            stroke-dasharray="276.46"
+                            stroke-dashoffset="{{ ring_offset }}"/>
+                </svg>
+                <div class="ring-center">
+                    <span class="ring-pct">{{ pct }}%</span>
+                    <span class="ring-sub">{{ completed }}/{{ total }}</span>
+                </div>
             </div>
         </div>
         {% endif %}
 
-        <!-- 任务列表 -->
-        <main class="task-list">
+        <!-- 热力图 -->
+        <div class="heatmap-wrap">
+            <div class="heatmap-header-row">
+                <span class="heatmap-label">打卡记录</span>
+                <div class="heatmap-legend">
+                    <span>少</span>
+                    <div class="heatmap-legend-dot" style="background:rgba(60,60,67,0.06)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.15)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.35)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.55)"></div>
+                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.78)"></div>
+                    <span>多</span>
+                </div>
+            </div>
+            <div class="heatmap-grid">
+                {% for cell in heatmap %}
+                <div class="heatmap-cell{% if cell.is_today %} today{% endif %}"
+                     data-level="{{ cell.level }}"
+                     title="{{ cell.label }}{% if cell.level >= 0 %} · {{ cell.total }}项{% endif %}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 任务列表（iOS Grouped Table） -->
+        <div class="list-section">
             {% if tasks %}
                 {% set ns = namespace(current_subject='') %}
                 {% for task in tasks %}
                     {% if task.subject != ns.current_subject %}
                         {% set ns.current_subject = task.subject %}
-                        <div class="subject-header">
-                            {% if task.subject == 'math' %}📐 高数
-                            {% elif task.subject == 'english' %}📝 英语
-                            {% else %}😴 休息
+                        <div class="list-section-header">
+                            {% if task.subject == 'math' %}高数
+                            {% elif task.subject == 'english' %}英语
+                            {% else %}休息
                             {% endif %}
                         </div>
+                        <div class="list-card">
                     {% endif %}
-                    <div class="task-item status-{{ task.status }}" data-task-id="{{ task.id }}">
-                        <button class="check-btn"
+
+                    <div class="task-row status-{{ task.status }}"
+                         data-task-id="{{ task.id }}">
+                        <!-- iOS 圆形勾选框 -->
+                        <button class="ios-check status-{{ task.status }}"
                                 data-id="{{ task.id }}"
                                 data-status="{{ task.status }}"
                                 onclick="toggleTask(this)">
-                            {% if task.status == 'completed' %}✅
-                            {% elif task.status == 'partial' %}🔶
-                            {% elif task.status == 'skipped' %}⏭
-                            {% else %}⬜
-                            {% endif %}
                         </button>
-                        <div class="task-content" onclick="toggleTask(this.parentElement.querySelector('.check-btn'))">
-                            <div class="task-title {% if task.status == 'completed' %}done{% elif task.status == 'skipped' %}skipped{% endif %}">
+
+                        <div class="task-body">
+                            <span class="task-title-text {% if task.status == 'completed' %}done{% elif task.status == 'skipped' %}skipped{% endif %}"
+                                  data-task-id="{{ task.id }}"
+                                  onclick="startEditTitle(this)">
                                 {{ task.title }}
-                            </div>
+                            </span>
                             {% if task.description %}
-                            <div class="task-desc">{{ task.description }}</div>
+                            <div class="task-subtitle">{{ task.description }}</div>
                             {% endif %}
-                            <div class="task-meta">
-                                <span class="task-time">⏱ {{ task.estimated_minutes }}分钟</span>
+                            <div class="task-tags">
+                                <span class="task-tag {% if task.subject == 'math' %}math{% else %}english{% endif %}">
+                                    {{ '高数' if task.subject == 'math' else '英语' }}
+                                </span>
+                                <span class="task-time-text">{{ task.estimated_minutes }}分钟</span>
                                 {% if task.priority == 'high' %}
-                                <span class="task-priority high">⭐ 优先</span>
+                                <span class="task-tag priority-high">优先</span>
                                 {% endif %}
                             </div>
                         </div>
+
+                        <!-- 删除 -->
+                        <button class="row-delete-btn"
+                                data-id="{{ task.id }}"
+                                onclick="deleteTask(this, {{ task.id }})">✕</button>
                     </div>
+
+                    <!-- 同科目最后一个task，关闭 list-card -->
+                    {% set next_idx = loop.index %}
+                    {% if loop.last or tasks[next_idx].subject != task.subject %}
+                        </div> <!-- /list-card -->
+                    {% endif %}
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    <div class="empty-icon">📭</div>
-                    <p>今天还没有任务</p>
-                    <p class="empty-hint">去「计划」页面创建备考计划吧</p>
-                    <a href="/plan/create" class="btn-primary">创建计划</a>
+                    <div class="empty-state-icon">—</div>
+                    <div class="empty-state-text">今天还没有任务</div>
+                    <div class="empty-state-hint">点击右上角「+ 添加」开始</div>
                 </div>
             {% endif %}
-        </main>
 
-        <!-- 底部操作 -->
-        <footer class="bottom-bar">
-            <a href="/plan/{{ plan.id }}" class="btn-secondary">📋 查看完整计划</a>
-            <a href="/progress" class="btn-secondary">📊 学习统计</a>
-        </footer>
+            <!-- 添加任务行 -->
+            {% if tasks %}
+            <div class="add-task-row" onclick="toggleAddForm()" id="showAddFormBtn"
+                 style="margin-top:12px; border-radius:var(--radius); box-shadow:var(--shadow);">
+                <div class="add-task-icon">+</div>
+                <span>添加任务</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 添加表单 -->
+        <div class="list-section">
+            <div class="inline-add-form" id="inlineAddForm">
+                <div class="list-card">
+                    <div class="inline-add-form-inner">
+                        <div class="form-field">
+                            <input type="text" id="newTaskTitle" class="form-input-ios"
+                                   placeholder="任务标题" maxlength="200">
+                        </div>
+                        <div class="form-field form-field-row">
+                            <select id="newTaskSubject" class="form-select-ios">
+                                <option value="math">高数</option>
+                                <option value="english">英语</option>
+                            </select>
+                            <input type="number" id="newTaskMinutes" class="form-input-ios form-input-sm"
+                                   value="45" min="5" max="180" step="5">
+                            <span class="form-label-sm">分钟</span>
+                        </div>
+                        <div class="form-field form-field-row">
+                            <select id="newTaskPriority" class="form-select-ios">
+                                <option value="medium">普通</option>
+                                <option value="high">优先</option>
+                                <option value="low">低优先</option>
+                            </select>
+                        </div>
+                        <div class="form-actions-row">
+                            <button class="btn-ios secondary" onclick="toggleAddForm()">取消</button>
+                            <button class="btn-ios primary" onclick="addNewTask()">添加</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部 Tab Bar -->
+        <div class="tab-bar">
+            <a href="/" class="tab-item active">
+                <span class="tab-icon">&#x25A3;</span>
+                <span>今日</span>
+            </a>
+            <a href="/progress" class="tab-item">
+                <span class="tab-icon">&#x25E3;</span>
+                <span>进度</span>
+            </a>
+            <a href="/plan/{{ plan.id }}" class="tab-item">
+                <span class="tab-icon">&#x25A8;</span>
+                <span>计划</span>
+            </a>
+        </div>
     </div>
 
     <script src="/static/app.js"></script>
+    <script>
+        // 进度环入场动画
+        (function() {
+            var ring = document.querySelector('.ring-fill');
+            if (ring) {
+                var c = 276.46;
+                var o = parseFloat(ring.getAttribute('stroke-dashoffset'));
+                ring.style.strokeDasharray = c;
+                ring.style.strokeDashoffset = c;
+                setTimeout(function() { ring.style.strokeDashoffset = o; }, 250);
+            }
+        })();
+    </script>
 </body>
 </html>
