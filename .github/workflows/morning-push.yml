@@ -1,0 +1,24 @@
+name: Daily Morning Push (07:00 CST)
+
+on:
+  schedule:
+    # UTC 23:00 = 北京时间 07:00
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install flask flask-sqlalchemy openai requests
+      - name: Run morning push
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          SITE_BASE_URL: ${{ secrets.SITE_BASE_URL }}
+        run: python morning_push.py

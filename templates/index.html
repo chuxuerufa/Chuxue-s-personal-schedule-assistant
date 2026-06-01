@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="备考助手">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>今日计划 - 备考助手</title>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航 -->
+        <nav class="top-nav">
+            <h1 class="app-title">📚 备考助手</h1>
+            <div class="nav-links">
+                <a href="/" class="active">今日</a>
+                <a href="/progress">进度</a>
+                <a href="/plan/{{ plan.id }}">计划</a>
+            </div>
+        </nav>
+
+        <!-- 考试倒计时 -->
+        <div class="countdown-bar">
+            <span>⏳ 距 <strong>{{ plan.name }}</strong> 考试还有 <strong>{{ plan.to_dict().days_remaining }}</strong> 天</span>
+        </div>
+
+        <!-- 打卡 streak -->
+        {% if streak > 0 %}
+        <div class="streak-badge">
+            🔥 连续打卡 <strong>{{ streak }}</strong> 天
+        </div>
+        {% endif %}
+
+        <!-- 今日进度条 -->
+        {% if total > 0 %}
+        <div class="progress-summary">
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: {{ (completed + in_progress * 0.5) / total * 100 }}%"></div>
+            </div>
+            <div class="progress-text">
+                完成 {{ completed }}/{{ total }}
+                {% if in_progress > 0 %}（{{ in_progress }} 项进行中）{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 任务列表 -->
+        <main class="task-list">
+            {% if tasks %}
+                {% set ns = namespace(current_subject='') %}
+                {% for task in tasks %}
+                    {% if task.subject != ns.current_subject %}
+                        {% set ns.current_subject = task.subject %}
+                        <div class="subject-header">
+                            {% if task.subject == 'math' %}📐 高数
+                            {% elif task.subject == 'english' %}📝 英语
+                            {% else %}😴 休息
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    <div class="task-item status-{{ task.status }}" data-task-id="{{ task.id }}">
+                        <button class="check-btn"
+                                data-id="{{ task.id }}"
+                                data-status="{{ task.status }}"
+                                onclick="toggleTask(this)">
+                            {% if task.status == 'completed' %}✅
+                            {% elif task.status == 'partial' %}🔶
+                            {% elif task.status == 'skipped' %}⏭
+                            {% else %}⬜
+                            {% endif %}
+                        </button>
+                        <div class="task-content" onclick="toggleTask(this.parentElement.querySelector('.check-btn'))">
+                            <div class="task-title {% if task.status == 'completed' %}done{% elif task.status == 'skipped' %}skipped{% endif %}">
+                                {{ task.title }}
+                            </div>
+                            {% if task.description %}
+                            <div class="task-desc">{{ task.description }}</div>
+                            {% endif %}
+                            <div class="task-meta">
+                                <span class="task-time">⏱ {{ task.estimated_minutes }}分钟</span>
+                                {% if task.priority == 'high' %}
+                                <span class="task-priority high">⭐ 优先</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <p>今天还没有任务</p>
+                    <p class="empty-hint">去「计划」页面创建备考计划吧</p>
+                    <a href="/plan/create" class="btn-primary">创建计划</a>
+                </div>
+            {% endif %}
+        </main>
+
+        <!-- 底部操作 -->
+        <footer class="bottom-bar">
+            <a href="/plan/{{ plan.id }}" class="btn-secondary">📋 查看完整计划</a>
+            <a href="/progress" class="btn-secondary">📊 学习统计</a>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>{{ plan.name }} - 完整计划</title>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="top-nav">
+            <a href="/" class="back-btn">&larr; 返回</a>
+            <h1 class="app-title">{{ plan.name }}</h1>
+        </nav>
+
+        <!-- 计划信息 -->
+        <div class="plan-info-bar">
+            <span>考试日期：{{ plan.exam_date }}</span>
+            <span>剩余 {{ plan.to_dict().days_remaining }} 天</span>
+        </div>
+
+        <!-- 按周展开 -->
+        <main class="plan-weeks">
+            {% if weeks %}
+                {% for week in weeks %}
+                <details class="week-section" {% if week.is_current %}open{% endif %}>
+                    <summary>
+                        <span class="week-label">
+                            第 {{ week.week_num }} 周（{{ week.start_label }} - {{ week.end_label }}）
+                        </span>
+                        {% if week.is_current %}
+                        <span class="current-badge">本周</span>
+                        {% endif %}
+                    </summary>
+                    <div class="week-days">
+                        {% for day in week.days %}
+                        {% set tasks = tasks_by_date.get(day.iso, {}) %}
+                        <div class="day-block {% if day.is_today %}today{% endif %}">
+                            <div class="day-header">
+                                {{ day.label }} {{ day.weekday }}
+                                {% if day.is_today %}<span class="today-dot">●</span>{% endif %}
+                            </div>
+                            {% set rest_tasks = tasks.get('rest', []) %}
+                            {% if rest_tasks %}
+                            <div class="day-subject rest">休息日</div>
+                            {% for task in rest_tasks %}
+                            <div class="day-task rest-note">{{ task.title }}</div>
+                            {% endfor %}
+                            {% endif %}
+                            {% set math_tasks = tasks.get('math', []) %}
+                            {% if math_tasks %}
+                            <div class="day-subject">数学</div>
+                            {% for task in math_tasks %}
+                            <div class="day-task status-{{ task.status }}" title="{{ task.description or '' }}">
+                                <span class="task-status-icon">
+                                    {% if task.status == 'completed' %}+
+                                    {% elif task.status == 'partial' %}~
+                                    {% elif task.status == 'skipped' %}-{% else %}&middot;
+                                    {% endif %}
+                                </span>
+                                {{ task.title }}
+                                <small>({{ task.estimated_minutes }}min)</small>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            {% set eng_tasks = tasks.get('english', []) %}
+                            {% if eng_tasks %}
+                            <div class="day-subject">英语</div>
+                            {% for task in eng_tasks %}
+                            <div class="day-task status-{{ task.status }}" title="{{ task.description or '' }}">
+                                <span class="task-status-icon">
+                                    {% if task.status == 'completed' %}+
+                                    {% elif task.status == 'partial' %}~
+                                    {% elif task.status == 'skipped' %}-{% else %}&middot;
+                                    {% endif %}
+                                </span>
+                                {{ task.title }}
+                                <small>({{ task.estimated_minutes }}min)</small>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>计划加载中...</p>
+                </div>
+            {% endif %}
+        </main>
+
+        <!-- 底部 -->
+        <footer class="bottom-bar">
+            <a href="/plan/create" class="btn-secondary">重新生成</a>
+            <button class="btn-secondary" onclick="triggerAdjust()" id="adjustBtn">AI 调整下周</button>
+        </footer>
+    </div>
+
+    <script>
+        async function triggerAdjust() {
+            const btn = document.getElementById('adjustBtn');
+            btn.disabled = true;
+            btn.textContent = 'AI 分析中...';
+            try {
+                const resp = await fetch('/api/plan/{{ plan.id }}/adjust', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({daily_hours: 4})
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    alert('AI 建议：\n' + (data.adjustment.adjustment_reason || '查看详情'));
+                    location.reload();
+                } else {
+                    alert('调整失败：' + (data.error || '未知错误'));
+                }
+            } catch(e) {
+                alert('请求失败：' + e.message);
+            }
+            btn.disabled = false;
+            btn.textContent = 'AI 调整下周';
+        }
+    </script>
+</body>
+</html>

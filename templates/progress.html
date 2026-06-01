@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>学习进度 - 备考助手</title>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="top-nav">
+            <a href="/" class="back-btn">← 返回</a>
+            <h1 class="app-title">📊 学习进度</h1>
+        </nav>
+
+        {% if streak > 0 %}
+        <div class="streak-badge large">
+            🔥 连续打卡 <strong>{{ streak }}</strong> 天
+        </div>
+        {% endif %}
+
+        <!-- 科目进度 -->
+        <div class="stats-grid">
+            <div class="stat-card math">
+                <div class="stat-icon">📐</div>
+                <div class="stat-label">高数</div>
+                <div class="stat-numbers">
+                    {{ math_done }} / {{ math_total }}
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar math-fill" style="width: {{ (math_done / math_total * 100) if math_total > 0 else 0 }}%"></div>
+                </div>
+                <div class="stat-pct">
+                    {{ "%.0f" | format(math_done / math_total * 100) if math_total > 0 else 0 }}%
+                </div>
+            </div>
+            <div class="stat-card english">
+                <div class="stat-icon">📝</div>
+                <div class="stat-label">英语</div>
+                <div class="stat-numbers">
+                    {{ eng_done }} / {{ eng_total }}
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar eng-fill" style="width: {{ (eng_done / eng_total * 100) if eng_total > 0 else 0 }}%"></div>
+                </div>
+                <div class="stat-pct">
+                    {{ "%.0f" | format(eng_done / eng_total * 100) if eng_total > 0 else 0 }}%
+                </div>
+            </div>
+        </div>
+
+        <!-- 总进度 -->
+        <div class="overall-progress">
+            <h3>总进度</h3>
+            {% set total_all = math_total + eng_total %}
+            {% set done_all = math_done + eng_done %}
+            <div class="big-progress-bar">
+                <div class="big-progress-fill" style="width: {{ (done_all / total_all * 100) if total_all > 0 else 0 }}%">
+                    {% if total_all > 0 %}{{ "%.0f" | format(done_all / total_all * 100) }}%{% endif %}
+                </div>
+            </div>
+            <div class="big-progress-text">{{ done_all }} / {{ total_all }} 任务已完成</div>
+        </div>
+
+        <!-- 每日完成率 -->
+        {% if dates_data %}
+        <div class="daily-stats">
+            <h3>每日完成率</h3>
+            <div class="daily-list">
+                {% for d, stats in dates_data.items() | sort %}
+                <div class="daily-row">
+                    <span class="daily-date">{{ d }}</span>
+                    <div class="daily-bar-bg">
+                        <div class="daily-bar-fill" style="width: {{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                    </div>
+                    <span class="daily-count">{{ stats.completed }}/{{ stats.total }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
