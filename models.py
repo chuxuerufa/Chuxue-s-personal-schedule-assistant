@@ -11,6 +11,7 @@ db = SQLAlchemy()
 class PlanStatus(str, enum.Enum):
     ACTIVE = "active"
     ARCHIVED = "archived"
+    PAUSED = "paused"
 
 
 class TaskStatus(str, enum.Enum):

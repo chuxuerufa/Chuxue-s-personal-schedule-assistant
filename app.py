@@ -132,10 +132,27 @@ def _calc_heatmap(plan_id, days=42):
 
 # ─── 页面路由 ─────────────────────────────────────────────
 
+@app.before_request
+def _load_user_keys():
+    """从请求头读取用户自设的 API Key（可选多用户支持）"""
+    from flask import g
+    g.user_ds_key = request.headers.get("X-User-DS-Key", "")
+    g.user_fs_url = request.headers.get("X-User-FS-URL", "")
+
+
+@app.route("/settings")
+def settings_page():
+    """用户设置页 —— 配置自己的 API Key"""
+    plan = _get_active_plan()
+    return render_template("settings.html", plan=plan)
+
+
 @app.route("/")
 def index():
     """主页 —— 今日任务总览"""
-    plan = _get_active_plan()
+    plan = Plan.query.filter(
+        Plan.status.in_([PlanStatus.ACTIVE.value, PlanStatus.PAUSED.value])
+    ).first()
     if not plan:
         return redirect(url_for("plan_create"))
 
@@ -168,6 +185,7 @@ def index():
         ring_offset=ring_offset,
         heatmap=heatmap,
         today=date.today(),
+        is_paused=(plan.status == PlanStatus.PAUSED.value),
     )
 
 
@@ -187,6 +205,8 @@ def plan_create():
         english_level = request.form["english_level"]
         daily_hours = float(request.form["daily_hours"])
         weak_subjects = request.form.get("weak_subjects", "")
+        user_ds_key = request.form.get("user_ds_key", "") or g.get("user_ds_key", "")
+        plan_name = request.form.get("exam_name", "").strip()
 
         try:
             plan = generate_initial_plan(
@@ -195,6 +215,8 @@ def plan_create():
                 english_level=english_level,
                 daily_hours=daily_hours,
                 weak_subjects=weak_subjects,
+                user_ds_key=user_ds_key,
+                plan_name=plan_name,
             )
             return redirect(url_for("plan_view", plan_id=plan.id))
         except Exception as e:
@@ -259,11 +281,48 @@ def plan_view(plan_id):
         subj = t.subject if t.subject in ("math", "english", "rest") else "rest"
         tasks_by_date[key][subj].append(t)
 
+    # 计算三阶段概览
+    phases = []
+    if all_dates:
+        total_span = (all_dates[-1] - all_dates[0]).days
+        p1_end = all_dates[0] + timedelta(days=int(total_span * 0.4))
+        p2_end = all_dates[0] + timedelta(days=int(total_span * 0.75))
+
+        phase_defs = [
+            ("基础阶段", "系统学习教材，掌握核心概念与公式", all_dates[0], p1_end),
+            ("强化阶段", "大量刷题，攻克重点难点", p1_end + timedelta(days=1), p2_end),
+            ("冲刺阶段", "真题模拟，查漏补缺", p2_end + timedelta(days=1), all_dates[-1]),
+        ]
+
+        for name, goal, start, end in phase_defs:
+            tasks_in_phase = [t for t in all_tasks if start <= t.task_date <= end]
+            total_p = len(tasks_in_phase)
+            done_p = len([t for t in tasks_in_phase if t.status == TaskStatus.COMPLETED.value])
+            phases.append({
+                "name": name,
+                "goal": goal,
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "days": (end - start).days + 1,
+                "total_tasks": total_p,
+                "done_tasks": done_p,
+                "pct": int(done_p / total_p * 100) if total_p > 0 else 0,
+            })
+
+    # 整体完成率
+    overall_total = len(all_tasks)
+    overall_done = len([t for t in all_tasks if t.status == TaskStatus.COMPLETED.value])
+    overall_pct = int(overall_done / overall_total * 100) if overall_total > 0 else 0
+
     return render_template(
         "plan_view.html",
         plan=plan,
         weeks=weeks,
         tasks_by_date=tasks_by_date,
+        phases=phases,
+        overall_pct=overall_pct,
+        overall_done=overall_done,
+        overall_total=overall_total,
         today=date.today(),
     )
 
@@ -576,6 +635,32 @@ def api_adjust_weekly(plan_id):
         return jsonify({"ok": True, "adjustment": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/plan/<int:plan_id>/pause", methods=["POST"])
+def api_pause_plan(plan_id):
+    """暂停计划"""
+    plan = db.session.get(Plan, plan_id)
+    if not plan:
+        return jsonify({"error": "计划不存在"}), 404
+    if plan.status != PlanStatus.ACTIVE.value:
+        return jsonify({"error": "只有活跃的计划才能暂停"}), 400
+    plan.status = PlanStatus.PAUSED.value
+    db.session.commit()
+    return jsonify({"ok": True, "status": "paused"})
+
+
+@app.route("/api/plan/<int:plan_id>/resume", methods=["POST"])
+def api_resume_plan(plan_id):
+    """恢复计划"""
+    plan = db.session.get(Plan, plan_id)
+    if not plan:
+        return jsonify({"error": "计划不存在"}), 404
+    if plan.status != PlanStatus.PAUSED.value:
+        return jsonify({"error": "只有暂停的计划才能恢复"}), 400
+    plan.status = PlanStatus.ACTIVE.value
+    db.session.commit()
+    return jsonify({"ok": True, "status": "active"})
 
 
 # ─── 云端推送触发器（供 Render Cron 调用）───────

@@ -4,87 +4,162 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="/static/style.css">
-    <title>{{ plan.name }} - 备考助手</title>
+    <title>Plan — Study Planner</title>
 </head>
 <body>
     <div class="app-container">
         <nav class="top-nav">
-            <a href="/" class="nav-back">← 返回</a>
-            <span class="nav-title">备考助手</span>
-            <span></span>
+            <div class="nav-left">
+                <span class="nav-brand">Planner</span>
+                <div class="nav-links">
+                    <a href="/">今日</a>
+                    <a href="/progress">进度</a>
+                    <a href="/plan/{{ plan.id }}" class="active">计划</a>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <span style="font-size:11px;color:var(--text-tertiary)">{{ plan.to_dict().days_remaining }}天</span>
+                <a href="/settings" class="nav-btn" title="设置">&#x2699;</a>
+                <a href="/" class="nav-btn">返回</a>
+            </div>
         </nav>
 
-        <div class="large-title-area">
-            <h1 class="large-title">计划</h1>
-            <div class="countdown-inline">
-                {{ plan.exam_date }} · 剩 {{ plan.to_dict().days_remaining }} 天
+        <div class="page-header">
+            <h1 class="page-title">计划</h1>
+            <div class="page-subtitle">{{ plan.name }} &middot; 考试：{{ plan.exam_date }} &middot; 剩余 {{ plan.to_dict().days_remaining }} 天</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-row">
+            <a href="/plan/create" class="btn">重新生成计划</a>
+            <button class="btn" onclick="triggerAdjust()" id="adjustBtn">AI 调整下周</button>
+            {% if plan.status == 'paused' %}
+            <button class="btn" onclick="togglePause()" style="color:var(--success);">&#9654; 恢复</button>
+            {% else %}
+            <button class="btn" onclick="togglePause()" style="color:var(--warning);">&#9646;&#9646; 暂停</button>
+            {% endif %}
+        </div>
+
+        <!-- Overall -->
+        <div class="progress-wrap">
+            <div class="progress-header">
+                <span class="progress-label">总完成进度</span>
+                <span class="progress-pct">{{ overall_pct }}% &middot; {{ overall_done }}/{{ overall_total }}</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" style="width:{{ overall_pct }}%" id="overallBar"></div>
             </div>
         </div>
 
-        <!-- 展开/收起 -->
-        <div class="week-toggle-row">
-            <button class="btn-ios secondary" id="expandAllBtn" onclick="expandAll()">展开全部</button>
-            <button class="btn-ios secondary" id="collapseAllBtn" onclick="collapseAll()" style="display:none;">收起全部</button>
+        <!-- Phase Overview -->
+        {% if phases %}
+        <div class="section">
+            <div class="section-header">
+                <span class="section-label">三阶段规划</span>
+            </div>
+        </div>
+        <div class="phase-grid">
+            {% for p in phases %}
+            <div class="phase-card">
+                <div class="phase-header">
+                    <span class="phase-name">{{ p.name }}</span>
+                    <span class="phase-pct">{{ p.pct }}%</span>
+                </div>
+                <div class="phase-bar-track">
+                    <div class="phase-bar-fill" style="width:{{ p.pct }}%"></div>
+                </div>
+                <div class="phase-goal">{{ p.goal }}</div>
+                <div class="phase-meta">
+                    <span>{{ p.start }} — {{ p.end }}</span>
+                    <span>{{ p.days }}天 &middot; {{ p.done_tasks }}/{{ p.total_tasks }}项</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Methodology -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-label">科学方法论</span>
+            </div>
+            <div class="method-grid">
+                <div class="method-item">
+                    <div class="method-title">间隔重复</div>
+                    <div class="method-desc">基于艾宾浩斯遗忘曲线，每 7 天安排一次复习复盘，强化记忆巩固。</div>
+                </div>
+                <div class="method-item">
+                    <div class="method-title">交叉练习</div>
+                    <div class="method-desc">数学与英语每日交替学习，避免单科疲劳，提升长期记忆效率。</div>
+                </div>
+                <div class="method-item">
+                    <div class="method-title">渐进超负荷</div>
+                    <div class="method-desc">基础（40%）建立概念 → 强化（35%）大量刷题 → 冲刺（25%）真题模拟。</div>
+                </div>
+                <div class="method-item">
+                    <div class="method-title">休息 & 恢复</div>
+                    <div class="method-desc">每周 1 天休息日，巩固所学并防止倦怠。规律休息是高效学习的关键。</div>
+                </div>
+            </div>
         </div>
 
-        <!-- 周列表 -->
+        <!-- Weekly detail -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-label">逐周详情</span>
+                <div class="week-toggle">
+                    <button class="btn ghost" id="expandAllBtn" onclick="expandAll()" style="font-size:11px;">展开全部</button>
+                    <button class="btn ghost" id="collapseAllBtn" onclick="collapseAll()" style="display:none;font-size:11px;">收起全部</button>
+                </div>
+            </div>
+        </div>
+
         <div class="week-list">
             {% if weeks %}
                 {% for week in weeks %}
                 <details class="week-card" {% if week.is_current %}open{% endif %}>
                     <summary>
-                        <span class="week-label">第 {{ week.week_num }} 周（{{ week.start_label }} - {{ week.end_label }}）</span>
+                        <span>第 {{ week.week_num }} 周 &middot; {{ week.start_label }} — {{ week.end_label }}</span>
                         {% if week.is_current %}
-                        <span class="current-badge">本周</span>
+                        <span class="week-badge">本周</span>
                         {% endif %}
                     </summary>
-                    <div class="week-days">
+                    <div class="week-grid">
                         {% for day in week.days %}
                         {% set tasks = tasks_by_date.get(day.iso, {}) %}
                         {% set math_tasks = tasks.get('math', []) %}
                         {% set eng_tasks = tasks.get('english', []) %}
                         {% set rest_tasks = tasks.get('rest', []) %}
                         {% set task_count = math_tasks|length + eng_tasks|length %}
-                        <div class="day-block {% if day.is_today %}today{% endif %}">
-                            <div class="day-header">
+                        <div class="day-cell {% if day.is_today %}today{% endif %}">
+                            <div class="day-cell-header">
                                 {{ day.label }} {{ day.weekday }}
-                                {% if day.is_today %}<span class="today-dot">●</span>{% endif %}
-                                {% if task_count > 0 %}
-                                <span class="day-task-count">{{ task_count }}项</span>
-                                {% endif %}
+                                {% if day.is_today %}<span class="day-cell-dot">●</span>{% endif %}
+                                {% if task_count > 0 %}<span class="day-cell-count">{{ task_count }}</span>{% endif %}
                             </div>
                             {% if rest_tasks %}
-                            <div class="day-subject rest">休息日</div>
+                            <div class="day-sub rest">休息</div>
                             {% for task in rest_tasks %}
                             <div class="day-task rest-note">{{ task.title }}</div>
                             {% endfor %}
                             {% endif %}
                             {% if math_tasks %}
-                            <div class="day-subject math">高数</div>
+                            <div class="day-sub math">高数</div>
                             {% for task in math_tasks %}
                             <div class="day-task">
-                                <span class="task-status-icon">
-                                    {% if task.status == 'completed' %}✓{% elif task.status == 'partial' %}◐{% elif task.status == 'skipped' %}−{% else %}·{% endif %}
-                                </span>
-                                {{ task.title }}
-                                <small>{{ task.estimated_minutes }}min</small>
+                                <span class="task-dot">{{ '✓' if task.status == 'completed' else '◐' if task.status == 'partial' else '−' if task.status == 'skipped' else '·' }}</span>
+                                {{ task.title }} <small>{{ task.estimated_minutes }}分钟</small>
                             </div>
                             {% endfor %}
                             {% endif %}
                             {% if eng_tasks %}
-                            <div class="day-subject english">英语</div>
+                            <div class="day-sub english">英语</div>
                             {% for task in eng_tasks %}
                             <div class="day-task">
-                                <span class="task-status-icon">
-                                    {% if task.status == 'completed' %}✓{% elif task.status == 'partial' %}◐{% elif task.status == 'skipped' %}−{% else %}·{% endif %}
-                                </span>
-                                {{ task.title }}
-                                <small>{{ task.estimated_minutes }}min</small>
+                                <span class="task-dot">{{ '✓' if task.status == 'completed' else '◐' if task.status == 'partial' else '−' if task.status == 'skipped' else '·' }}</span>
+                                {{ task.title }} <small>{{ task.estimated_minutes }}分钟</small>
                             </div>
                             {% endfor %}
-                            {% endif %}
-                            {% if not rest_tasks and not math_tasks and not eng_tasks %}
-                            <div class="day-subject" style="color:var(--text-muted)">—</div>
                             {% endif %}
                         </div>
                         {% endfor %}
@@ -92,32 +167,23 @@
                 </details>
                 {% endfor %}
             {% else %}
-                <div class="empty-state">
-                    <div class="empty-state-icon">—</div>
-                    <div class="empty-state-text">暂无计划</div>
-                    <a href="/plan/create" class="btn-ios primary large" style="margin-top:12px;">创建计划</a>
-                </div>
+                <div class="empty-state"><p>暂无计划数据</p></div>
             {% endif %}
-        </div>
-
-        <!-- Tab Bar -->
-        <div class="tab-bar">
-            <a href="/" class="tab-item">
-                <span class="tab-icon">&#x25A3;</span>
-                <span>今日</span>
-            </a>
-            <a href="/progress" class="tab-item">
-                <span class="tab-icon">&#x25E3;</span>
-                <span>进度</span>
-            </a>
-            <a href="/plan/{{ plan.id }}" class="tab-item active">
-                <span class="tab-icon">&#x25A8;</span>
-                <span>计划</span>
-            </a>
         </div>
     </div>
 
     <script>
+        async function togglePause() {
+            var isPaused = '{{ plan.status }}' === 'paused';
+            var url = isPaused
+                ? '/api/plan/{{ plan.id }}/resume'
+                : '/api/plan/{{ plan.id }}/pause';
+            if (!confirm(isPaused ? '恢复计划？' : '暂停计划？暂停后推送将停止。')) return;
+            var r = await fetch(url, { method: 'POST' });
+            var d = await r.json();
+            if (d.ok) location.reload();
+            else alert('失败：' + (d.error || ''));
+        }
         function expandAll() {
             document.querySelectorAll('.week-card').forEach(el => el.open = true);
             document.getElementById('expandAllBtn').style.display = 'none';
@@ -130,19 +196,23 @@
         }
         async function triggerAdjust() {
             const btn = document.getElementById('adjustBtn');
-            btn.disabled = true; btn.textContent = '分析中…';
+            btn.disabled = true; btn.textContent = 'AI 分析中...';
             try {
                 const resp = await fetch('/api/plan/{{ plan.id }}/adjust', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({daily_hours: 4})
                 });
                 const data = await resp.json();
-                if (data.ok) { alert('AI 建议：\n' + (data.adjustment.adjustment_reason || '查看详情')); location.reload(); }
-                else alert('调整失败：' + (data.error || ''));
+                if (data.ok) { alert(data.adjustment.adjustment_reason || '已调整'); location.reload(); }
+                else alert('失败：' + (data.error || ''));
             } catch(e) { alert('请求失败'); }
             btn.disabled = false; btn.textContent = 'AI 调整下周';
         }
+        (function() {
+            var bar = document.getElementById('overallBar');
+            if (bar) { var w = bar.style.width; bar.style.width = '0%';
+                setTimeout(function() { bar.style.width = w; }, 150); }
+        })();
     </script>
 </body>
 </html>

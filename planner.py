@@ -18,9 +18,10 @@ def _load_prompt(filename: str) -> str:
         return f.read()
 
 
-def _call_deepseek(system_prompt: str, user_message: str) -> dict:
+def _call_deepseek(system_prompt: str, user_message: str, user_ds_key: str = "") -> dict:
     """调用 DeepSeek API，返回解析后的 JSON"""
-    response = client.chat.completions.create(
+    _client = _get_client(user_ds_key)
+    response = _client.chat.completions.create(
         model=DEEPSEEK_MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -41,12 +42,20 @@ def _call_deepseek(system_prompt: str, user_message: str) -> dict:
     return json.loads(content)
 
 
+def _get_client(user_ds_key=""):
+    """获取 AI 客户端，优先使用用户 Key"""
+    key = user_ds_key or DEEPSEEK_API_KEY
+    return OpenAI(api_key=key, base_url=DEEPSEEK_BASE_URL)
+
+
 def generate_initial_plan(
     exam_date_str: str,
     math_level: str,
     english_level: str,
     daily_hours: float,
     weak_subjects: str = "",
+    user_ds_key: str = "",
+    plan_name: str = "",
 ) -> Plan:
     """
     生成初始备考计划
@@ -74,11 +83,11 @@ def generate_initial_plan(
 每天总学习时长不超过 {daily_hours} 小时（即 {int(daily_hours * 60)} 分钟）。
 """
 
-    plan_data = _call_deepseek(system_prompt, user_message)
+    plan_data = _call_deepseek(system_prompt, user_message, user_ds_key)
 
     # 创建 Plan
     plan = Plan(
-        name=plan_data.get("plan_name", "专升本备考计划"),
+        name=plan_name or plan_data.get("plan_name", "备考计划"),
         exam_date=exam_date,
     )
     db.session.add(plan)
@@ -117,6 +126,7 @@ def adjust_weekly_plan(
     completion_rate: float,
     unfinished_tasks: list,
     daily_hours: float,
+    user_ds_key: str = "",
 ) -> list[dict]:
     """
     根据本周完成情况，用 AI 调整下周计划
@@ -148,7 +158,7 @@ def adjust_weekly_plan(
         "week_range": f"{next_monday.isoformat()} ~ {next_sunday.isoformat()}",
     }, ensure_ascii=False)
 
-    adjusted = _call_deepseek(system_prompt, user_message)
+    adjusted = _call_deepseek(system_prompt, user_message, user_ds_key)
 
     # 创建/更新每周总结
     summary = WeeklySummary.query.filter_by(

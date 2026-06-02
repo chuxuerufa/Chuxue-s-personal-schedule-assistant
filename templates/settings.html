@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Settings — Study Planner</title>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="top-nav">
+            <div class="nav-left">
+                <span class="nav-brand">Planner</span>
+                <div class="nav-links">
+                    <a href="/">今日</a>
+                    <a href="/progress">进度</a>
+                    <a href="/plan/{{ plan.id }}">计划</a>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <a href="/" class="nav-btn">返回</a>
+            </div>
+        </nav>
+
+        <div class="page-header">
+            <h1 class="page-title">设置</h1>
+            <div class="page-subtitle">配置你自己的 API Key，数据完全独立</div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-card">
+                <div class="form-card-label">API 配置（可选）</div>
+                <div class="form-card-body">
+                    <div class="form-group">
+                        <label for="userDsKey">DeepSeek API Key</label>
+                        <input type="password" id="userDsKey" class="ln-input"
+                               placeholder="sk-xxxxxxxxxxxxxxxx"
+                               autocomplete="off">
+                        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">
+                            留空使用服务器默认 Key。从 <a href="https://platform.deepseek.com" target="_blank" style="color:var(--accent);">platform.deepseek.com</a> 获取。
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="userFsUrl">飞书 Webhook URL</label>
+                        <input type="text" id="userFsUrl" class="ln-input"
+                               placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx"
+                               autocomplete="off">
+                        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">
+                            留空使用服务器默认 Webhook。飞书群 → 设置 → 添加机器人 → 复制 Webhook 地址。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding:8px 16px;">
+            <button class="btn primary large" onclick="saveSettings()" style="width:100%;">保存设置</button>
+            <button class="btn large" onclick="clearSettings()" style="width:100%;margin-top:8px;">清除本地设置</button>
+        </div>
+
+        <div style="padding:0 16px;">
+            <p style="font-size:11px;color:var(--text-tertiary);text-align:center;">
+                设置仅存储在你的浏览器中，不会上传到服务器。清除浏览器数据会丢失设置。
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // 加载已保存的设置
+        (function() {
+            var ds = localStorage.getItem('user_ds_key');
+            var fs = localStorage.getItem('user_fs_url');
+            if (ds) document.getElementById('userDsKey').value = ds;
+            if (fs) document.getElementById('userFsUrl').value = fs;
+        })();
+
+        function saveSettings() {
+            var ds = document.getElementById('userDsKey').value.trim();
+            var fs = document.getElementById('userFsUrl').value.trim();
+            if (ds) localStorage.setItem('user_ds_key', ds);
+            else localStorage.removeItem('user_ds_key');
+            if (fs) localStorage.setItem('user_fs_url', fs);
+            else localStorage.removeItem('user_fs_url');
+            alert('设置已保存');
+        }
+
+        function clearSettings() {
+            if (!confirm('确定要清除本地设置？')) return;
+            localStorage.removeItem('user_ds_key');
+            localStorage.removeItem('user_fs_url');
+            document.getElementById('userDsKey').value = '';
+            document.getElementById('userFsUrl').value = '';
+            alert('已清除');
+        }
+    </script>
+</body>
+</html>

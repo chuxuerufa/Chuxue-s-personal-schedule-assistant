@@ -4,127 +4,96 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="stylesheet" href="/static/style.css">
-    <title>进度 - 备考助手</title>
+    <title>Progress — Study Planner</title>
 </head>
 <body>
     <div class="app-container">
         <nav class="top-nav">
-            <a href="/" class="nav-back">← 返回</a>
-            <span class="nav-title">备考助手</span>
-            <span></span>
+            <div class="nav-left">
+                <span class="nav-brand">Planner</span>
+                <div class="nav-links">
+                    <a href="/">今日</a>
+                    <a href="/progress" class="active">进度</a>
+                    <a href="/plan/{{ plan.id }}">计划</a>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <span style="font-size:11px;color:var(--text-tertiary)">{{ plan.to_dict().days_remaining }}天</span>
+                <a href="/settings" class="nav-btn" title="设置">&#x2699;</a>
+                <a href="/" class="nav-btn">返回</a>
+            </div>
         </nav>
 
-        <div class="large-title-area">
-            <h1 class="large-title">进度</h1>
-            {% if streak > 0 %}
-            <div class="streak-inline">连续打卡 {{ streak }} 天</div>
-            {% endif %}
-        </div>
-
-        <!-- 总体环形进度 -->
-        <div class="progress-ring-wrap">
-            <div class="ring-container">
-                <svg viewBox="0 0 100 100">
-                    <circle class="ring-bg" cx="50" cy="50" r="44"/>
-                    <circle class="ring-fill" cx="50" cy="50" r="44"
-                            stroke-dasharray="276.46"
-                            stroke-dashoffset="{{ ring_offset_lg }}"/>
-                </svg>
-                <div class="ring-center">
-                    <span class="ring-pct">{{ overall_pct }}%</span>
-                    <span class="ring-sub">总进度</span>
-                </div>
+        <div class="page-header">
+            <h1 class="page-title">进度</h1>
+            <div class="page-subtitle">
+                {{ plan.name }}
+                {% if streak > 0 %}&middot; 连续打卡 {{ streak }} 天{% endif %}
             </div>
         </div>
 
-        <!-- 科目卡片 -->
+        {% set total_all = math_total + eng_total %}
+        {% set done_all = math_done + eng_done %}
+        <div class="progress-wrap">
+            <div class="progress-header">
+                <span class="progress-label">总进度</span>
+                <span class="progress-pct">{{ overall_pct }}% &middot; {{ done_all }}/{{ total_all }}</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" style="width:{{ overall_pct }}%"></div>
+            </div>
+        </div>
+
         <div class="stats-grid">
-            <div class="stat-card-ios math">
-                <div class="stat-icon-ios">M</div>
-                <div class="stat-label-ios">高数</div>
-                <div class="stat-number-ios">{{ math_done }}<span style="font-size:16px;color:var(--text-muted);font-weight:400"> / {{ math_total }}</span></div>
-                <div class="stat-bar-bg-ios">
-                    <div class="stat-bar-ios math-bar" style="width:{{ math_pct }}%"></div>
-                </div>
-                <div class="stat-sub-ios">{{ math_pct }}%</div>
+            <div class="stat-cell">
+                <div class="stat-number">{{ math_done }}<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">/{{ math_total }}</span></div>
+                <div class="stat-label">高数</div>
+                <div class="stat-bar-track"><div class="stat-bar-fill math" style="width:{{ math_pct }}%"></div></div>
+                <div class="stat-sub">{{ math_pct }}%</div>
             </div>
-            <div class="stat-card-ios english">
-                <div class="stat-icon-ios">E</div>
-                <div class="stat-label-ios">英语</div>
-                <div class="stat-number-ios">{{ eng_done }}<span style="font-size:16px;color:var(--text-muted);font-weight:400"> / {{ eng_total }}</span></div>
-                <div class="stat-bar-bg-ios">
-                    <div class="stat-bar-ios eng-bar" style="width:{{ eng_pct }}%"></div>
-                </div>
-                <div class="stat-sub-ios">{{ eng_pct }}%</div>
+            <div class="stat-cell">
+                <div class="stat-number">{{ eng_done }}<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">/{{ eng_total }}</span></div>
+                <div class="stat-label">英语</div>
+                <div class="stat-bar-track"><div class="stat-bar-fill eng" style="width:{{ eng_pct }}%"></div></div>
+                <div class="stat-sub">{{ eng_pct }}%</div>
             </div>
         </div>
 
-        <!-- 热力图 -->
-        <div class="heatmap-wrap" style="margin-top:16px;">
-            <div class="heatmap-header-row">
+        <div class="heatmap-wrap">
+            <div class="heatmap-header">
                 <span class="heatmap-label">打卡记录</span>
-                <div class="heatmap-legend">
-                    <span>少</span>
-                    <div class="heatmap-legend-dot" style="background:rgba(60,60,67,0.06)"></div>
-                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.15)"></div>
-                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.35)"></div>
-                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.55)"></div>
-                    <div class="heatmap-legend-dot" style="background:rgba(77,148,255,0.78)"></div>
-                    <span>多</span>
-                </div>
             </div>
             <div class="heatmap-grid">
                 {% for cell in heatmap %}
                 <div class="heatmap-cell{% if cell.is_today %} today{% endif %}"
                      data-level="{{ cell.level }}"
-                     title="{{ cell.label }}{% if cell.level >= 0 %} · {{ cell.total }}项{% endif %}">
+                     title="{{ cell.label }}{% if cell.level >= 0 %} {{ cell.total }}项{% endif %}">
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- 每日列表 -->
         {% if dates_data %}
-        <div class="daily-list-section" style="margin-top:16px;">
-            <h3>每日详情</h3>
+        <div class="daily-section">
+            <div class="daily-header">每日详情</div>
             {% for d, stats in dates_data.items() | sort | reverse %}
-            <div class="daily-row-ios">
-                <span class="daily-date-col">{{ d }}</span>
-                <div class="daily-bar-col">
-                    <div class="daily-bar-fill-col" style="width:{{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+            <div class="daily-row">
+                <span class="daily-date">{{ d }}</span>
+                <div class="daily-bar-track">
+                    <div class="daily-bar-fill" style="width:{{ (stats.completed / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
                 </div>
-                <span class="daily-count-col">{{ stats.completed }}/{{ stats.total }}</span>
+                <span class="daily-count">{{ stats.completed }}/{{ stats.total }}</span>
             </div>
             {% endfor %}
         </div>
         {% endif %}
-
-        <!-- Tab Bar -->
-        <div class="tab-bar">
-            <a href="/" class="tab-item">
-                <span class="tab-icon">&#x25A3;</span>
-                <span>今日</span>
-            </a>
-            <a href="/progress" class="tab-item active">
-                <span class="tab-icon">&#x25E3;</span>
-                <span>进度</span>
-            </a>
-            <a href="/plan/{{ plan.id }}" class="tab-item">
-                <span class="tab-icon">&#x25A8;</span>
-                <span>计划</span>
-            </a>
-        </div>
     </div>
 
     <script>
         (function() {
-            var ring = document.querySelector('.ring-fill');
-            if (ring) {
-                var c = 276.46, o = parseFloat(ring.getAttribute('stroke-dashoffset'));
-                ring.style.strokeDasharray = c;
-                ring.style.strokeDashoffset = c;
-                setTimeout(function() { ring.style.strokeDashoffset = o; }, 250);
-            }
+            var f = document.querySelector('.progress-fill');
+            if (f) { var w = f.style.width; f.style.width = '0%';
+                setTimeout(function() { f.style.width = w; }, 100); }
         })();
     </script>
 </body>
